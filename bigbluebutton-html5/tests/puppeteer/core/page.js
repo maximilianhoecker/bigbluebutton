@@ -4,6 +4,7 @@ const fs = require('fs');
 const helper = require('./helper');
 const params = require('../params');
 const e = require('./elements');
+const path = require('path');
 
 class Page {
   constructor(name) {
@@ -32,14 +33,36 @@ class Page {
     const joinURL = helper.getJoinURL(this.meetingId, this.effectiveParams, isModerator);
 
     await this.page.goto(joinURL);
-    await this.waitForSelector(e.audioDialog);
-    await this.click(e.closeAudio, true);
     const checkForGetMetrics = async () => {
       if (process.env.BBB_COLLECT_METRICS === 'true') {
         await this.getMetrics();
       }
     };
+    if (process.env.IS_AUDIO_TEST !== 'true') {
+      await this.closeAudioModal();
+    }
     await checkForGetMetrics();
+  }
+
+  // Joining audio with microphone
+  async joinMicrophone() {
+    await this.waitForSelector(e.audioDialog);
+    await this.waitForSelector(e.microphoneButton);
+    await this.click(e.microphoneButton, true);
+    await this.waitForSelector(e.echoYes);
+    await this.click(e.echoYes, true);
+  }
+
+  // Joining audio with Listen Only mode
+  async listenOnly() {
+    await this.waitForSelector(e.audioDialog);
+    await this.waitForSelector(e.listenButton);
+    await this.click(e.listenButton);
+  }
+
+  async closeAudioModal() {
+    await this.waitForSelector(e.audioDialog);
+    await this.click(e.closeAudio, true);
   }
 
   async setDownloadBehavior(downloadPath) {
@@ -65,6 +88,19 @@ class Page {
     return { headless: false, args: ['--no-sandbox', '--use-fake-ui-for-media-stream'] };
   }
 
+  static getArgsWithAudio() {
+    return {
+      headless: false,
+      args: [
+        '--no-sandbox',
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+        `--use-file-for-fake-audio-capture=${path.join(__dirname,'../media/audio.wav')}`,
+        '--allow-file-access',
+      ],
+    };
+  }
+
   static getArgsWithVideo() {
     return {
       headless: false,
@@ -72,8 +108,8 @@ class Page {
         '--no-sandbox',
         '--use-fake-ui-for-media-stream',
         '--use-fake-device-for-media-stream',
-        `--use-file-for-fake-video-capture=${process.env.VIDEO_FILE}`,
-        '--allow-file-access'
+        `--use-file-for-fake-video-capture=${path.join(__dirname,'../media/video_rgb.y4m')}`,
+        '--allow-file-access',
       ],
     };
   }
